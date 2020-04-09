@@ -55,7 +55,7 @@ export class AggregateContainer extends Layout {
         const { dock, globalScope, groupings, niceScale, parentHeight, parentScope, showAxes } = props;
 
         //this needs to be global since the scale depends on it
-        addTransforms(getDataByName(globalScope.scope.data, globalScope.dataName),
+        addTransforms(getDataByName(globalScope.scope.data, globalScope.dataName).data,
             {
                 ...this.getTransforms(
                     aggregation,

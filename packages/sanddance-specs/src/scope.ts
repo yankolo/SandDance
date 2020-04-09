@@ -44,8 +44,8 @@ export function addTransforms(data: Data, ...transforms: Transforms[]) {
     data.transform.push(...transforms);
 }
 
-export function getDataByName(data: Data[], dataName: string): Data {
+export function getDataByName(data: Data[], dataName: string) {
     for (let i = 0; i < data.length; i++) {
-        if (data[i].name === dataName) return data[i];
+        if (data[i].name === dataName) return { data: data[i], index: i };
     }
 }

@@ -3,7 +3,7 @@
 import { addColor } from './color';
 import { addFacetAxesGroupMarks } from './facetTitle';
 import { addGlobalAxes, AxesScopeMap } from './axes';
-import { addScale, addSignal } from './scope';
+import { addScale, addSignal, getDataByName } from './scope';
 import {
     axesOffsetX,
     axesOffsetY,
@@ -146,7 +146,7 @@ export class SpecBuilder {
                 this.plotOffsetTop.update = `${facetLayout.plotPadding.y}`;
                 this.plotOffsetRight.update = `${facetLayout.plotPadding.x}`;
             }
-            const { firstScope, finalScope, specResult, allGlobalScales, allEncodingRules } = this.iterateLayouts(globalScope, groupMark, colorDataName);
+            const { firstScope, finalScope, specResult, allGlobalScales, allEncodingRules, groupings } = this.iterateLayouts(globalScope, groupMark, colorDataName);
             if (specResult) {
                 return specResult;
             }
@@ -185,6 +185,9 @@ export class SpecBuilder {
                     axesScopes
                 });
             }
+
+            this.insertDataGroupings(dataName, groupings, globalScope);
+
             //add mark to the final scope
             if (finalScope.mark) {
                 const { update } = finalScope.mark.encode;
@@ -215,6 +218,28 @@ export class SpecBuilder {
                 vegaSpec
             };
         }
+    }
+
+    private insertDataGroupings(dataName: string, groupings: string[][], globalScope: GlobalScope) {
+        let source = dataName;
+        const sourceData = getDataByName(globalScope.scope.data, dataName);
+        const data = [sourceData.data];
+        while (groupings.length) {
+            let group = `group_${groupings.length - 1}`;
+            data.push({
+                name: group,
+                source,
+                transform: [
+                    {
+                        type: 'aggregate',
+                        groupby: groupings.reduce((acc, val) => acc.concat(val), [])
+                    }
+                ]
+            });
+            groupings.pop();
+            source = group;
+        }
+        globalScope.scope.data.splice(sourceData.index, 1, ...data);
     }
 
     private createGlobalScope(dataName: string, scope: Spec) {
@@ -349,7 +374,7 @@ export class SpecBuilder {
             }
             parentScope = childScope;
         }
-        return { firstScope, finalScope: parentScope, specResult, allGlobalScales, allEncodingRules };
+        return { firstScope, finalScope: parentScope, specResult, allGlobalScales, allEncodingRules, groupings };
     }
 
     private createLayout(layoutPair: LayoutPair, buildProps: LayoutBuildProps) {
