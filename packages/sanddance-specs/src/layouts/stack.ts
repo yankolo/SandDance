@@ -1,12 +1,22 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
-import { addData, addMarks, addSignal } from '../scope';
-import { Column } from '@msrvida/chart-types';
-import { FieldNames } from '../constants';
-import { GroupMark, Transforms, Scope, RectMark } from 'vega-typings';
-import { InnerScope } from '../interfaces';
 import { Layout, LayoutBuildProps, LayoutProps } from './layout';
+import { FieldNames } from '../constants';
+import { InnerScope } from '../interfaces';
+import {
+    addData,
+    addMarks,
+    addSignal,
+    getGroupBy
+} from '../scope';
 import { testForCollapseSelection } from '../selection';
+import { Column } from '@msrvida/chart-types';
+import {
+    GroupMark,
+    RectMark,
+    Scope,
+    Transforms
+} from 'vega-typings';
 
 export interface StackProps extends LayoutProps {
     sort: Column;
@@ -62,7 +72,7 @@ export class Stack extends Layout {
                 transform: [
                     {
                         type: 'aggregate',
-                        groupby: groupings.reduce((acc, val) => acc.concat(val), []),
+                        groupby: getGroupBy(groupings),
                         ops: ['count'],
                         as: [FieldNames.Count]
                     },
@@ -233,7 +243,7 @@ export class Stack extends Layout {
             encodingRuleMap: {
                 y: [{
                     test: testForCollapseSelection(),
-                    signal: names.size 
+                    signal: names.size
                 }],
                 z: [{
                     test: testForCollapseSelection(),

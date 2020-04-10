@@ -1,17 +1,19 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
+import { Layout, LayoutBuildProps, LayoutProps } from './layout';
+import { FieldNames } from '../constants';
+import { FieldOp, InnerScope } from '../interfaces';
 import {
     addData,
     addMarks,
     addSignal,
     addTransforms,
-    getDataByName
+    getDataByName,
+    getGroupBy
 } from '../scope';
-import { InnerScope } from '../interfaces';
+import { testForCollapseSelection } from '../selection';
 import { Column } from '@msrvida/chart-types';
 import { GroupMark, JoinAggregateTransform } from 'vega-typings';
-import { Layout, LayoutBuildProps, LayoutProps } from './layout';
-import { testForCollapseSelection } from '../selection';
 
 export interface AggregateSquareProps extends LayoutProps {
     aggregation: 'sum' | 'count';
@@ -53,6 +55,17 @@ export class AggregateSquare extends Layout {
         };
     }
 
+    public getAggregateSumOp() {
+        if (this.props.aggregation === 'sum') {
+            const fieldOp: FieldOp = {
+                field: this.props.sumBy.name,
+                op: 'sum',
+                as: FieldNames.Sum
+            };
+            return fieldOp;
+        }
+    }
+
     public build(): InnerScope {
         const { names, prefix, props } = this;
         const { aggregation, globalScope, groupings, parentHeight, parentScope } = props;
@@ -63,7 +76,7 @@ export class AggregateSquare extends Layout {
             {
                 ...this.getTransforms(
                     aggregation,
-                    groupings.reduce((acc, val) => acc.concat(val), [])
+                    getGroupBy(groupings)
                 ),
                 as: [names.aggregateField]
             },

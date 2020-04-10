@@ -1,18 +1,26 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
-import { addData, addMarks, addSignal } from '../scope';
+import { Layout, LayoutBuildProps, LayoutProps } from './layout';
+import { FieldNames } from '../constants';
+import { InnerScope } from '../interfaces';
+import {
+    addData,
+    addMarks,
+    addSignal,
+    getGroupBy,
+    addTransforms,
+    getDataByName
+} from '../scope';
+import { testForCollapseSelection } from '../selection';
 import { addZScale } from '../zBase';
 import { Column } from '@msrvida/chart-types';
-import { FieldNames } from '../constants';
 import {
     GroupEncodeEntry,
     NumericValueRef,
     RectMark,
-    Transforms
+    Transforms,
+    FormulaTransform
 } from 'vega-typings';
-import { InnerScope } from '../interfaces';
-import { Layout, LayoutBuildProps, LayoutProps } from './layout';
-import { testForCollapseSelection } from '../selection';
 
 export interface SquareProps extends LayoutProps {
     sortBy: Column;
@@ -27,6 +35,7 @@ export interface SquareProps extends LayoutProps {
 export class Square extends Layout {
     private names: {
         dataName: string,
+        markData: string,
         aspect: string,
         bandWidth: string,
         squaresPerBand: string,
@@ -38,6 +47,8 @@ export class Square extends Layout {
         facetData: string,
         grouping: string,
         maxGroup: string,
+        stack0: string,
+        stack1: string,
         zScale: string
     }
 
@@ -46,6 +57,7 @@ export class Square extends Layout {
         const p = this.prefix = `square_${this.id}`;
         this.names = {
             dataName: `data_${p}`,
+            markData: `data_${p}_mark`,
             aspect: `${p}_aspect`,
             bandWidth: this.getBandWidth(),
             squaresPerBand: `${p}_squares_per_band`,
@@ -57,16 +69,36 @@ export class Square extends Layout {
             facetData: `facet_${p}`,
             grouping: `data_${p}_grouping`,
             maxGroup: `${p}_max_grouping`,
+            stack0: `${p}_stack0`,
+            stack1: `${p}_stack1`,
             zScale: `scale_${p}_z`
         };
     }
 
     public build(): InnerScope {
         const { names, prefix, props } = this;
-        const { fillDirection, globalScope, parentScope, collapseYHeight, z } = props;
+        const { fillDirection, globalScope, groupings, parentScope, collapseYHeight, sortBy, z } = props;
         let { zSize } = props;
         zSize = zSize || parentScope.sizeSignals.layoutHeight;
         addZScale(z, zSize, globalScope, names.zScale);
+
+        addData(globalScope.scope, {
+            name: names.markData,
+            source: globalScope.dataName,
+            transform: [
+                {
+                    type: 'stack',
+                    groupby: getGroupBy(groupings),
+                    as: [names.stack0, names.stack1],
+                    sort: {
+                        field: sortBy.name,
+                        order: 'ascending'
+                    }
+                },
+                ...this.transformXY()
+            ]
+        });
+
         const xy = this.encodeXY();
         if (collapseYHeight) {
             xy.y = [
@@ -125,6 +157,7 @@ export class Square extends Layout {
 
         return {
             dataName: prefix,
+            markData: names.markData,
             mark,
             sizeSignals: {
                 layoutHeight: names.size,
@@ -180,7 +213,7 @@ export class Square extends Layout {
                         transform: [
                             {
                                 type: 'aggregate',
-                                groupby: groupings.reduce((acc, val) => acc.concat(val), []),
+                                groupby: getGroupBy(groupings),
                                 ops: ['count'],
                                 as: [FieldNames.Count]
                             },
@@ -203,7 +236,7 @@ export class Square extends Layout {
 
         const aspect = `((${names.bandWidth}) / (${maxGroupedFillSize}))`;
 
-        addSignal(parentScope.scope,
+        addSignal(globalScope.scope,
             {
                 name: names.aspect,
                 update: aspect || `${globalScope.sizeSignals.layoutWidth} / ${props.fillDirection === 'down-right' ? globalScope.sizeSignals.layoutWidth : globalScope.sizeSignals.layoutHeight}`
@@ -229,6 +262,39 @@ export class Square extends Layout {
                 update: `((${maxGroupedFillSize}) / ${names.levels}) - ${names.gap}`
             }
         );
+    }
+
+    private transformXY() {
+        const { names } = this;
+        const compartment = `${names.bandWidth} / ${names.squaresPerBand} * ((datum[${JSON.stringify(names.stack0)}] - 1) % ${names.squaresPerBand})`;
+        const level = `floor((datum[${JSON.stringify(names.stack0)}] - 1) / ${names.squaresPerBand})`;
+        const { fillDirection, parentScope } = this.props;
+        const tx: FormulaTransform = {
+            type: 'formula',
+            expr: null,
+            as: FieldNames.OffsetX
+        };
+        const ty: FormulaTransform = {
+            type: 'formula',
+            expr: null,
+            as: FieldNames.OffsetY
+        };
+        switch (fillDirection) {
+            case 'down-right': {
+                tx.expr = `${level} * (${names.levelSize} + ${names.gap})`;
+                ty.expr = compartment;
+            }
+            case 'right-up': {
+                tx.expr = compartment;
+                ty.expr = `(${parentScope.sizeSignals.layoutHeight}) - ${names.levelSize} - ${level} * (${names.levelSize} + ${names.gap})`;
+            }
+            case 'right-down':
+            default: {
+                tx.expr = compartment;
+                ty.expr = `${level} * (${names.levelSize} + ${names.gap})`;
+            }
+        }
+        return [tx, ty];
     }
 
     private encodeXY(): GroupEncodeEntry {

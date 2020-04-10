@@ -1,17 +1,19 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
+import { Layout, LayoutBuildProps, LayoutProps } from './layout';
+import { FieldNames } from '../constants';
+import { AxisScale, FieldOp, InnerScope } from '../interfaces';
 import {
     addData,
     addMarks,
     addSignal,
     addTransforms,
-    getDataByName
+    getDataByName,
+    getGroupBy
 } from '../scope';
-import { AxisScale, InnerScope } from '../interfaces';
+import { testForCollapseSelection } from '../selection';
 import { Column } from '@msrvida/chart-types';
 import { GroupMark, JoinAggregateTransform, LinearScale } from 'vega-typings';
-import { Layout, LayoutBuildProps, LayoutProps } from './layout';
-import { testForCollapseSelection } from '../selection';
 
 export interface AggregateContainerProps extends LayoutProps {
     dock: 'bottom' | 'top' | 'left';
@@ -32,7 +34,8 @@ export class AggregateContainer extends Layout {
         scale: string,
         localAggregateExtentSignal: string,
         localScaled: string,
-        extentData: string
+        extentData: string,
+        offsets: string
     };
 
     constructor(public props: AggregateContainerProps & LayoutBuildProps) {
@@ -46,20 +49,33 @@ export class AggregateContainer extends Layout {
             scale: `scale_${p}`,
             localAggregateExtentSignal: `${p}_local_extent`,
             localScaled: `${p}_local_scaled`,
-            extentData: `data_${p}_extent`
+            extentData: `data_${p}_extent`,
+            offsets: `data_${p}_offsets`
         };
     }
 
+    public getAggregateSumOp() {
+        if (this.aggregation === 'sum') {
+            const fieldOp: FieldOp = {
+                field: this.props.sumBy.name,
+                op: 'sum',
+                as: FieldNames.Sum
+            };
+            return fieldOp;
+        }
+    }
+
     public build(): InnerScope {
-        const { aggregation, names, prefix, props } = this;
+        const { aggregation, id, names, prefix, props } = this;
         const { dock, globalScope, groupings, niceScale, parentHeight, parentScope, showAxes } = props;
+        const lastGrouping = groupings[groupings.length - 1];
 
         //this needs to be global since the scale depends on it
         addTransforms(getDataByName(globalScope.scope.data, globalScope.dataName).data,
             {
                 ...this.getTransforms(
                     aggregation,
-                    groupings.reduce((acc, val) => acc.concat(val), [])
+                    getGroupBy(groupings)
                 ),
                 as: [names.aggregateField]
             },
@@ -130,6 +146,47 @@ export class AggregateContainer extends Layout {
         };
         addMarks(parentScope.scope, mark);
 
+        const offsetKey = lastGrouping.groupby[0];
+        const f = aggregation === 'sum' ? FieldNames.Sum : FieldNames.Count;
+        const groupScaled = `scale(${JSON.stringify(names.scale)}, datum[${JSON.stringify(f)}])`;
+        addData(globalScope.scope, {
+            name: names.offsets,
+            source: `group_${lastGrouping.id}`,
+            transform: [
+                {
+                    type: 'formula',
+                    expr: `0`,
+                    as: FieldNames.OffsetX
+                },
+                {
+                    type: 'formula',
+                    expr: dock === 'bottom' ? groupScaled : '0'
+                    ,
+                    as: FieldNames.OffsetY
+                },
+                {
+                    type: 'formula',
+                    expr: horizontal ?
+                        parentScope.sizeSignals.layoutHeight
+                        :
+                        dock === 'top'
+                            ? groupScaled
+                            : `${parentScope.sizeSignals.layoutHeight} - ${groupScaled}`
+                    ,
+                    as: FieldNames.OffsetHeight
+                },
+                {
+                    type: 'formula',
+                    expr: horizontal ?
+                        groupScaled
+                        :
+                        parentScope.sizeSignals.layoutWidth
+                    ,
+                    as: FieldNames.OffsetWidth
+                }
+            ]
+        });
+
         const scale: LinearScale = {
             type: 'linear',
             name: names.scale,
@@ -175,6 +232,10 @@ export class AggregateContainer extends Layout {
 
         return {
             dataName: parentScope.dataName,
+            offsetData: {
+                dataName: names.offsets,
+                key: offsetKey
+            },
             scope: mark,
             sizeSignals: horizontal ?
                 {
