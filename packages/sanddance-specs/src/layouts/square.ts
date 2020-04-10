@@ -283,15 +283,18 @@ export class Square extends Layout {
             case 'down-right': {
                 tx.expr = `${level} * (${names.levelSize} + ${names.gap})`;
                 ty.expr = compartment;
+                break;
             }
             case 'right-up': {
                 tx.expr = compartment;
                 ty.expr = `(${parentScope.sizeSignals.layoutHeight}) - ${names.levelSize} - ${level} * (${names.levelSize} + ${names.gap})`;
+                break;
             }
             case 'right-down':
             default: {
                 tx.expr = compartment;
                 ty.expr = `${level} * (${names.levelSize} + ${names.gap})`;
+                break;
             }
         }
         return [tx, ty];
