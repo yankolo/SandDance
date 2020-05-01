@@ -31,6 +31,12 @@
     "d3-ease": "^1.0.5",
     "deepmerge": "^2.1.1",
     "tsx-create-element": "^2.1.0",
-    "vega-typings": "^0.14.2"
+    "vega-typings": "^0.16.0"
+  },
+  "devDependencies": {
+    "@deck.gl/core": "6.4",
+    "@deck.gl/layers": "6.4",
+    "luma.gl": "6.4",
+    "vega": "5.11.1"
   }
 }
