@@ -7,6 +7,7 @@
     "dist"
   ],
   "scripts": {
+    "vegatest": "parcel serve ./test/vegaspec/vega-deck.gl.test.html --port 8087 --open --no-hmr --global vegaTest",
     "docs": "npx -p @danmarshall/ts-docs-gen ts-docs-gen --entryFile src/index.ts -o ../../docs/docs/vega-deck.gl/v2/",
     "deploy": "node ./scripts/deploy.js",
     "eslint": "eslint -c ../../.eslintrc.json --fix ./src/**/*.ts*",
