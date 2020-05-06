@@ -12,100 +12,320 @@ export { vega };
 
 /* eslint-disable */
 export const spec: vega.Spec = {
-    "$schema": "https://vega.github.io/schema/vega/v4.json",
-    "background": "#DEDEDE",
-    "width": 500,
-    "height": 200,
+    "$schema": "https://vega.github.io/schema/vega/v5.json",
+    "description": "Stock prices of 5 Tech Companies over Time.",
+    "background": "white",
     "padding": 5,
-
+    "width": 700,
+    "height": 600,
+    "style": "cell",
+    "signals": [
+        {
+        "name": "indexDate",
+        "update": "time('Mar 4 2020')",
+        "on": [
+          {
+            "events": "mousemove",
+            "update": "invert('x', clamp(x(), 0, width))"
+          }
+        ]
+      },
+      {
+        "name": "which",
+        "value": "cases",
+        "bind": {
+          "input": "select",
+          "options": ["deaths", "cases"]
+        }
+  
+      },
+      {
+        "name": "top",
+        "value": 10,
+        "bind": {
+          "input": "range",
+          "min":5,
+          "max":50,
+          "step":1
+        }
+      },
+      {
+        "name": "axisnames",
+        "update": "{'Positive': 'Total Positive Tests', 'Total Tests': 'Total Reported Tests', 'Deaths':'Total Deaths','Tests/10k':'Tests Per 10K People', 'New Positives':'New Positives', 'New Tests':'New Tests', 'New Deaths':'New Deaths'}"
+      },
+      {
+        "name": "axislabel",
+        "update": "axisnames[which]"
+      }
+  
+    ],
     "data": [
-        {
-            "name": "table",
-            "values": [
-                { "x": 0, "y": 28, "c": 0 }, { "x": 0, "y": 55, "c": 1 },
-                { "x": 1, "y": 43, "c": 0 }, { "x": 1, "y": 91, "c": 1 },
-                { "x": 2, "y": 81, "c": 0 }, { "x": 2, "y": 53, "c": 1 },
-                { "x": 3, "y": 19, "c": 0 }, { "x": 3, "y": 87, "c": 1 },
-                { "x": 4, "y": 52, "c": 0 }, { "x": 4, "y": 48, "c": 1 },
-                { "x": 5, "y": 24, "c": 0 }, { "x": 5, "y": 49, "c": 1 },
-                { "x": 6, "y": 87, "c": 0 }, { "x": 6, "y": 66, "c": 1 },
-                { "x": 7, "y": 17, "c": 0 }, { "x": 7, "y": 27, "c": 1 },
-                { "x": 8, "y": 68, "c": 0 }, { "x": 8, "y": 16, "c": 1 },
-                { "x": 9, "y": 49, "c": 0 }, { "x": 9, "y": 15, "c": 1 }
-            ],
-            "transform": [
-                {
-                    "type": "stack",
-                    "groupby": ["x"],
-                    "sort": { "field": "c" },
-                    "field": "y"
-                }
-            ]
-        }
+      {
+        "name": "Covid",
+        "url": "https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv",
+        "format": {"type": "csv", "parse": "auto", "delimiter": ","},
+        "transform": [      
+          {
+            "field": "date",
+            "type": "timeunit",
+            "units": ["year", "month", "date"],
+            "timezone": "utc",
+            "as": ["utcyearmonthdate_Date", "utcyearmonthdate_Date_end"]
+          },
+          {
+            "type": "formula",
+            "as": "Value",
+            "expr": "datum[which]"
+          },
+          {"type": "filter", "expr": "datum['Value'] > 0"},
+          {"type": "filter", "expr": "datum['fips'] > 0"},
+          {"type": "collect",
+            "sort": {"field":"state"}
+          }
+        ]
+      },
+      {
+        "name": "ranks",
+        "source": "Covid",
+        "transform": [
+          {
+            "type": "formula",
+            "as": "SortValue",
+            "expr": "datum['Value']"
+          },
+          {
+            "type": "aggregate",
+            "groupby": ["fips","state","county"],
+            "ops": ["max"],
+            "fields": ["SortValue"],
+            "as": ["TotalSortVal"]
+          },
+          {
+            "type": "window",
+            "sort": {"field": "TotalSortVal", "order": "descending"},
+            "ops": ["row_number"], "as": ["rank"]
+          },
+          {"type": "collect",
+            "sort": {"field":"rank"}
+          },
+          {"type": "formula",
+            "as": "countystate",
+            "expr": "datum['county'] + ', ' + datum['state']"
+          }
+        ]    
+      },
+      {
+        "name": "rankedCovid",
+        "source": "Covid",
+        "transform": [
+          {
+            "type": "lookup",
+            "from": "ranks",
+            "key": "fips",
+            "values": ["rank"],
+            "fields": ["fips"]
+          },
+          {"type": "collect",
+            "sort": {"field":"rank"}
+          },
+          {
+            "type": "filter", "expr": "datum['rank'] < top"
+          }
+        ]    
+      },
+      {
+        "name": "forLegend",
+        "source": "ranks",
+        "transform": [
+    {
+            "type": "filter", "expr": "datum['rank'] < top"
+          }
+        ]
+      }
+  
     ],
-
     "scales": [
-        {
-            "name": "x",
-            "type": "band",
-            "range": "width",
-            "domain": { "data": "table", "field": "x" }
-        },
-        {
-            "name": "y",
-            "type": "linear",
-            "range": "height",
-            "nice": true, "zero": true,
-            "domain": { "data": "table", "field": "y1" }
-        },
-        {
-            "name": "color",
-            "type": "ordinal",
-            "range": "category",
-            "domain": { "data": "table", "field": "c" }
-        }
+      {
+        "name": "x",
+        "type": "utc",
+        "domain": {"data": "rankedCovid", "field": "utcyearmonthdate_Date"},
+        "range": [0, {"signal": "width"}]
+      },
+      {
+        "name": "ylin",
+        "type": "linear",
+        "domain": {"data": "rankedCovid", "field": "Value"},
+        "range": [{"signal": "height"}, 0],
+        "nice": true,
+        "zero": true
+      },
+      {
+        "name": "y",
+        "type": "log",
+        "base": 10,
+        "domain": {"data": "rankedCovid", "field": "Value"},
+        "range": [{"signal": "height"}, 0],
+        "nice": true
+      },
+      {
+        "name": "color",
+        "type": "ordinal",
+        "domain": {"data": "forLegend", "field": "fips"},
+        "sort": true,
+        "range": "category"
+      },
+      {"name": "fipslookup",
+        "type": "ordinal",
+        "domain": {"data":"ranks", "field": "fips"},
+        "range": {"data":"ranks", "field": "countystate"}
+      }
     ],
-
     "axes": [
-        { "orient": "bottom", "scale": "x", "title": "X Axis", "tickColor": "red", "tickWidth": 3, "labelColor": "blue", "titleColor": "green" },
-        { "orient": "left", "scale": "y", "title": "Y Axis", "domainColor": "magenta", "domainWidth": 2, "tickWidth": 7 }
-    ],
-
-    "marks": [
-        {
-            "type": "rect",
-            "from": { "data": "table" },
-            "encode": {
-                "enter": {
-                    "x": { "scale": "x", "field": "x" },
-                    "width": { "scale": "x", "band": 1, "offset": -1 },
-                    "y": { "scale": "y", "field": "y0" },
-                    "y2": { "scale": "y", "field": "y1" },
-                    "fill": { "scale": "color", "field": "c" }
-                },
-                "update": {
-                    "fillOpacity": { "value": 1 }
-                },
-                "hover": {
-                    "fillOpacity": { "value": 0.5 }
-                }
+      {
+        "scale": "x",
+        "orient": "bottom",
+        "gridScale": "y",
+        "grid": true,
+        "tickCount": {"signal": "ceil(width/40)"},
+        "domain": false,
+        "labels": false,
+        "maxExtent": 0,
+        "minExtent": 0,
+        "ticks": false,
+        "zindex": 0
+      },
+      {
+        "scale": "y",
+        "orient": "left",
+        "gridScale": "x",
+        "grid": true,
+        "tickCount": {"signal": "ceil(height/40)"},
+        "domain": false,
+        "labels": false,
+        "maxExtent": 0,
+        "minExtent": 0,
+        "ticks": false,
+        "zindex": 0
+      },
+      {
+        "scale": "x",
+        "orient": "bottom",
+        "grid": false,
+        "title": "Date",
+        "titleFontSize": {"value": 18},
+        "labelFlush": true,
+        "labelOverlap": true,
+        "tickCount": {"signal": "ceil(width/40)"},
+        "encode": {
+          "labels": {
+            "update": {
+              "text": {
+                "signal": "utcFormat(datum.value, timeUnitSpecifier([\"year\",\"month\",\"date\"], {\"year-month\":\"%b %Y \",\"year-month-date\":\"%b %d, %Y \"}))"
+              },
+              "fontSize": {"value": 10}
             }
-        }
+          }
+        },
+        "zindex": 0
+      },
+      {
+        "scale": "y",
+        "orient": "left",
+        "grid": false,
+        "title": {"signal": "axislabel"},
+        "titleFontSize": {"value": 18},
+        "labelOverlap": true,
+        "tickCount": {"signal": "ceil(height/40)"},
+        "zindex": 0,
+        "labelFontSize": {"value": 14}
+      }
     ],
     "legends": [
-        {
-            "fill": "color",
-            "title": "Legend",
-            "encode": {
-                "symbols": {
-                    "update": {
-                        "shape": { "value": "square" }
-                    }
-                }
+      {
+        "stroke": "color",
+        "symbolType": "circle",
+        "title": "fips",
+        "encode": {
+          "symbols": {
+            "update": {"fill": {"value": "white"}, "opacity": {"value": 1}}
+          },
+          "labels": {
+            "update": {
+              "text": {"scale": "fipslookup", "field": "value"}
             }
+          }
+        },
+  
+        "labelFontSize": {"value": 18}
+      }
+    ],
+    "title": {
+      "text": {"signal": "'Log Plot of Covid-19 Trends in top ' + top + ' Statewide Cases'"},
+      "subtitle": {"signal": "axislabel"},
+      "subtitleFontSize": 16,
+      "fontSize": 20
+  
+    },
+    "marks": [
+      {
+        "type": "group",
+        "from": {
+          "facet": {"name": "series", "data": "rankedCovid", "groupby": "fips"}
+        },
+        "marks": [
+          {
+            "name": "linemarks",
+            "type": "line",
+            "style": ["line"],
+            "sort": {"field": "datum[\"utcyearmonthdate_Date\"]"},
+            "from": {"data": "series"},
+            "encode": {
+              "update": {
+                "tooltip": {
+                  "signal": "{\"Date (year-month-date)\": timeFormat(datum[\"utcyearmonthdate_Date\"], timeUnitSpecifier([\"year\",\"month\",\"date\"], {\"year-month\":\"%b %Y \",\"year-month-date\":\"%b %d, %Y \"})), \"Value\": format(datum[\"Value\"], \"\"), \"StateName\": ''+scale('fipslookup',datum[\"fips\"])}"
+                },
+                "stroke": {"scale": "color", "field": "fips"},
+                "x": {"scale": "x", "field": "utcyearmonthdate_Date"},
+                "y": {"scale": "y", "field": "Value"}
+              }
+            }
+          },
+          {
+            "name": "pointmarks",
+            "type": "rect",
+            "from": {"data": "series"},
+            "encode": {
+              "update": {
+                "opacity": {"value": 1},
+                "fill": {"scale": "color", "field": "fips"},
+                "tooltip": {
+                  "signal": "{\"Date (year-month-date)\": timeFormat(datum[\"utcyearmonthdate_Date\"], timeUnitSpecifier([\"year\",\"month\",\"date\"], {\"year-month\":\"%b %Y \",\"year-month-date\":\"%b %d, %Y \"})), \"\": which+format(datum[\"Value\"], \"\"), \"state\": ''+scale('fipslookup',datum[\"fips\"])}"
+                },
+                "stroke": {"value": "black"},
+                "x": {"scale": "x", "field": "utcyearmonthdate_Date"},
+                "y": {"scale": "y", "field": "Value"},
+  "width": {"value": 5},
+  "height": {"value": 5}
+  
+              }
+            }
+          }
+        ]
+      },
+      {
+        "type": "rule",
+        "encode": {
+          "update": {
+            "x": {"scale": "x", "signal": "indexDate", "offset": 1.5},
+            "y": {"value": 0},
+            "y2": {"field": {"group": "height"}},
+            "stroke": {"value": "firebrick"}
+          }
         }
+      }
+  
     ]
-};
+  };
 /* eslint-enable */
 
 export const view = new VegaDeckGl.ViewGl(vega.parse(spec), { getView: () => '2d' })

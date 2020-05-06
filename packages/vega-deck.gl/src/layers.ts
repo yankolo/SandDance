@@ -11,6 +11,7 @@ import {
     VegaTextLayerDatum
 } from './interfaces';
 import { CubeLayer, CubeLayerInterpolatedProps, CubeLayerProps } from './cube-layer/cube-layer';
+import {PathLayer} from '@deck.gl/layers';
 import { DeckProps } from '@deck.gl/core/lib/deck';
 import { easeExpInOut } from 'd3-ease';
 import { Layer } from 'deck.gl';
@@ -47,6 +48,20 @@ export function getLayers(
     }
     const lineLayer = newLineLayer(layerNames.lines, lines);
     const textLayer = newTextLayer(presenter, layerNames.text, texts, config, presenter.style.fontFamily);
+
+    const data = [ 
+        {path: [[0.0,0.0], [1.0,2.0], [2.0,4.0], [3.0,9.0]],
+            name: 'test',
+            color: [255,0,0]}
+    ];
+    const pathLayer = new PathLayer({
+        id:'path-layer',
+        data,
+        pickable: false,
+        widthScale: 20,
+        getPath: d=>d.path,
+        getColor: d=> d.color
+    });
     return [textLayer, cubeLayer, lineLayer];
 }
 
