@@ -35,11 +35,15 @@
     "test-rec": "lerna run test --scope @msrvida/chart-recommender",
     "python-webpack-watch": "lerna run webpack-watch --scope @msrvida/sanddance-jupyter-widget --parallel",
     "azdata-webpack-extension": "lerna run webpack --scope azdata-sanddance --parallel",
-    "vscode-webpack-extension": "lerna run webpack --scope vscode-sanddance --parallel"
+    "vscode-webpack-extension": "lerna run webpack --scope vscode-sanddance --parallel",
+    "publish": "lerna publish"
   },
   "repository": {
     "type": "git",
     "url": "https://msrp-data-vis.visualstudio.com/_git/SandDanceCanvas"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
   },
   "author": "Dan Marshall",
   "license": "MIT",
